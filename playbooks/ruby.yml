@@ -1,0 +1,39 @@
+- hosts: all
+  become: yes
+  become_user: "{{ piku_user | default('piku', true)}}"
+
+  vars:
+    version: "{{ruby_version | default('null')}}"
+
+  tasks:
+    - name: Fetch rbenv install script
+      get_url:
+        url: https://github.com/rbenv/rbenv-installer/raw/HEAD/bin/rbenv-installer
+        dest: ~/
+        mode: 0700
+
+    - name: Run rbenv installer
+      shell: ~/rbenv-installer
+      args:
+        creates: ~/.rbenv
+
+    - name: Remove rbenv installer script
+      file:
+        path: ~/rbenv-installer
+        state: absent
+ 
+    - name: Add rbenv to profile
+      shell: echo 'export PATH="$HOME/.rbenv/bin:$PATH" && eval "$(rbenv init -)"' | cat - ~/.profile > ~/.profile.temp && mv ~/.profile.temp ~/.profile
+
+    - name: Install latest ruby
+      shell: bash -ilc 'rbenv install $(rbenv install -l | grep -v - | tail -1)'
+      when: version == "null"
+      ignore_errors: true
+
+    - name: Install selected ruby
+      shell: bash -ilc 'rbenv install {{version}}'
+      when: version != "null"
+      ignore_errors: true
+
+    - name: Install bundler
+      shell: bash -ilc 'gem install bundler'
